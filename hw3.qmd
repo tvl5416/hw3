@@ -31,6 +31,9 @@ library(dplyr)
 library(purrr)
 library(car)
 library(glmnet)
+library(broom)
+library(corrplot)
+
 ```
 
 
@@ -184,10 +187,7 @@ Print a vector containing the values of `t1`, `t2`, and `t3`. What can you concl
 c(t1, t2, t3)
 ```
 
-The same size of the t values from different tests shows there's a real difference in quality between red and white 
-wines. The direction of the difference flips in one test because of how we compared the wines. This tells that 
-the way we set up our tests matters, but no matter how we do it, we see that red and white wines are different 
-in quality.
+The same size of the t values from different tests shows there's a real difference in quality between red and white wines. The direction of the difference flips in one test because of how we compared the wines. This tells that the way we set up our tests matters, but no matter how we do it, we see that red and white wines are different in quality.
 
 
 
@@ -210,8 +210,12 @@ Collinearity
 Fit a linear regression model with all predictors against the response variable `quality`. Use the `broom::tidy()` function to print a summary of the fitted model. What can we conclude from the model summary?
 
 
-```R
-... # Insert your code here
+```{R}
+model <- lm(quality ~ ., data = df)
+
+tidy_summary <- tidy(model)
+
+tidy_summary
 ```
 
 
@@ -221,14 +225,19 @@ Fit a linear regression model with all predictors against the response variable 
 
 Fit two **simple** linear regression models using `lm()`: one with only `citric_acid` as the predictor, and another with only `total_sulfur_dioxide` as the predictor. In both models, use `quality` as the response variable. How does your model summary compare to the summary from the previous question?
 
+```{R}
+model_citric <- lm(quality ~ citric.acid, data = df)
+summary(model_citric)
 
-```R
-model_citric <- ... # Insert your code here
 ```
 
-```R
-model_sulfur <- ... # Insert your code here
+
+```{R}
+model_sulfur <- lm(quality ~ total.sulfur.dioxide, data = df)
+summary(model_sulfur)
 ```
+The model with type as a predictor shows a significant difference in wine quality between red and white wines, with a notable t value of 9.686, highlighting a clear impact of wine type on quality. However, the simple models reveal that while individual components like citric_acid positively affect wine quality and total_sulfur_dioxide negatively impacts it.
+
 
 
 ---
@@ -236,10 +245,15 @@ model_sulfur <- ... # Insert your code here
 ###### 2.3 (5 points)
 
 Visualize the correlation matrix of all numeric columns in `df` using `corrplot()`
+```{R}
+cor_matrix <- df %>% 
+  select_if(is.numeric) %>% 
+  cor()
 
-```R
-df %>% ... # Insert your code here
+# Visualize the correlation matrix
+corrplot(cor_matrix)
 ```
+
 
 
 
@@ -249,10 +263,15 @@ df %>% ... # Insert your code here
 
 Compute the variance inflation factor (VIF) for each predictor in the full model using `vif()` function. What can we conclude from this?
 
+```{R}
+full_model <- lm(quality ~ ., data = df)
 
-```R
-... # Insert your code here
+vif_values <- vif(full_model)
+
+vif_values
 ```
+
+The VIF numbers show that most things we measured don't have a big problem with overlapping information, except for "density" and "type" which are a bit high. This means "density" and "type" might be too similar to other things we measured, which can make the results less reliable for those two. 
 
 
 
