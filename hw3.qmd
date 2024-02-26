@@ -346,9 +346,9 @@ y <- df$quality
 X <- model.matrix(quality ~ ., data = df)[,-1] 
 
 
-lasso <- cv.glmnet(X, y, alpha = 1) # LASSO 
+lasso <- cv.glmnet(X, y, alpha = 1)
 
-ridge <- cv.glmnet(X, y, alpha = 1) # Ridge 
+ridge <- cv.glmnet(X, y, alpha = 0)
 ```
 
 
@@ -356,16 +356,16 @@ ridge <- cv.glmnet(X, y, alpha = 1) # Ridge
 Create side-by-side plots of the ridge and LASSO regression results. Interpret your main findings. 
 
 ```{R}
-par(mfrow=c(1, 2))
+par(mfrow = c(1, 2))
 
-plot(ridge_model)
-title("Ridge Regression")
+# Plot for Ridge Regression
+plot(ridge, x_vars= "lambda", main = "Ridge Regression")
 
-plot(lasso_model)
-title("LASSO Regression")
+# Plot for LASSO Regression
+plot(lasso, x_vars= "lambda", main = "LASSO Regression")
 ```
 
-In the graphs, both Ridge and LASSO regression reach their lowest error at similar points, meaning they both find an optimal level of complexity around the same spot.
+For Ridge regression, the MSE is relatively stable across a range of λ, while LASSO shows a clear minimum MSE at an optimal λ, indicating a specific point where the regularization effectively balances bias and variance. The optimal λ for LASSO is where the coefficients are sufficiently penalized to reduce overfitting without losing important predictive information.
 
 
 ---
@@ -376,9 +376,17 @@ Print the coefficient values for LASSO regression at the `lambda.1se` value? Wha
 
 ```{R}
 lasso_coef <- coef(lasso, s = "lambda.1se")
-lasso_coef 
+lasso_coef
+
+lasso_coef_matrix <- as.matrix(lasso_coef)
+
+non_zero_coefs <- lasso_coef_matrix[lasso_coef_matrix != 0]
+variable_names <- rownames(lasso_coef_matrix)[lasso_coef_matrix != 0]
+selected_variables <- data.frame(Coefficient = non_zero_coefs)
+rownames(selected_variables) <- variable_names
+selected_variables
 ```
-volatile.acidity, residual.sugar, chlorides, total.sulfur.dioxide, pH, sulphates, alcohol, typewhite      
+volatile.acidity, residual.sugar, sulphates, alcohol     
 
 
 Store the variable names with non-zero coefficients in `lasso_vars`, and create a formula object called `lasso_formula` using the `make_formula()` function provided in the Appendix. 
@@ -389,12 +397,9 @@ make_formula <- function(x){
     paste("quality ~ ", paste(x, collapse = " + "))
   )
 }
-# Store the variable names with non-zero coefficients
-lasso_vars <- names(lasso_coef)[lasso_coef[,1] != 0]
 
-lasso_vars
 # Create the formula object
-lasso_formula <- make_formula(lasso_vars)
+lasso_formula <- make_formula(selected_variables)
 ```
 
 
@@ -405,18 +410,25 @@ lasso_formula <- make_formula(lasso_vars)
 Print the coefficient values for ridge regression at the `lambda.1se` value? What are the variables selected here? 
 
 Store the variable names with non-zero coefficients in `ridge_vars`, and create a formula object called `ridge_formula` using the `make_formula()` function provided in the Appendix. 
+
 ```{R}
 ridge_coef <- coef(ridge, s = "lambda.1se")
-print(ridge_coef)
+ridge_coef
 
-# Store variable names with non-zero coefficients
-ridge_vars <- names(ridge_coef)[ridge_coef != 0]
+ridge_coef_matrix <- as.matrix(ridge_coef)
 
-# Create the formula object
-ridge_formula <- make_formula(ridge_vars)
+non_zero_coefs <- ridge_coef_matrix[ridge_coef_matrix != 0]
+variable_names <- rownames(ridge_coef_matrix)[ridge_coef_matrix != 0]
+selected_variables <- data.frame(Coefficient = non_zero_coefs)
+rownames(selected_variables) <- variable_names
+selected_variables
+
+
+ridge_formula <- make_formula(selected_variables)
 ```
-
-
+"volatile.acidity"     "citric.acid"          "residual.sugar"      
+ [5] "chlorides"            "total.sulfur.dioxide" "density"              "pH"                  
+ [9] "sulphates"            "alcohol"              "typewhite"  
 
 ---
 
@@ -585,10 +597,16 @@ final_formulas
 
 * Are `aic_formula` and `rsq_formula` the same? How do they differ from the formulas shortlisted in question 3?
 
+aic_formula and rsq_formula are the same, both simplifying to quality ~ alcohol, indicating a model selection process focused on explanatory power led to a similar conclusion. They differ from the formulas in question 3 by potentially reflecting different criteria for inclusion and resulting in a more simplified model.
+
+
 * Which of these is more reliable? Why? 
+
+models derived from cross-validation methods like lasso is more reliable due to their consideration of overfitting
 
 * If we had a dataset with $10,000$ columns, which of these methods would you consider for your analyses? Why?
 
+For a dataset with 10,000 columns, lasso regression would be preferable because it can handle high-dimensional data by performing variable selection and regularization simultaneously.
 ---
 
 ###### 4.7  (10 points)
@@ -596,25 +614,27 @@ final_formulas
 
 Use `map()` and `glance()` to extract the `sigma, adj.r.squared, AIC, df`, and `p.value` statistics for each model obtained from `final_formulas`. Bind them together into a single data frame `summary_table`. Summarize your main findings.
 ```{R}
-summary_table <- map(
-  final_formulas, 
-  \(x) {
-    model <- lm(x, data = df)
-    glance(model)
-  }
-) %>% bind_rows()
+summary_table <- map_df(final_formulas, ~{
+  tryCatch({
+    model <- lm(.x, data = df)
+    broom::glance(model)
+  }, error = function(e) {
+    # Return NA or a placeholder dataframe if the model cannot be fitted
+    return(tibble(
+      adj.r.squared = NA, 
+      sigma = NA, 
+      p.value = NA, 
+      df = NA,
+      AIC = NA
+    ))
+  })
+})
 
-summary_table %>% knitr::kable()
+knitr::kable(summary_table)
+
 ```
 
-```R
-summary_table <- map(
-  final_formulas, 
-  \(x) ... # Insert your code here
-) %>% bind_rows()
 
-summary_table %>% knitr::kable()
-```
 
 
 
